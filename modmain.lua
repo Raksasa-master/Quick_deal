@@ -1,6 +1,7 @@
 print("hello world")
 print("test\n")
 
+
 GLOBAL.setmetatable(env, { __index = function(t, k) return GLOBAL.rawget(GLOBAL, k) end })
 
 
@@ -15,34 +16,17 @@ params.deal_container = {
         slotpos = {},
         animbank = "ui_chest_3x3",
         animbuild = "ui_chest_3x3",
-        pos = Vector3(0, -120, 0),
+        pos = Vector3(0, 200, 0),
         side_align_tip = 0,
         buttoninfo =
         {
             text = "交易",
-            position = Vector3(0, -170, 0),
+            position = Vector3(0, -140, 0),
         }
     },
     type = "deal_container",
     itemtestfn = function(container, item, slot)
-        -- --print(type(item.components.tradable))
-        -- -- print(item.components.tradable ~= nil)
-        -- -- print(item.prefab)
-        -- -- return item.components.tradable~=nil
-        -- -- return item.prefab ~= "goldnugget"
-        -- if item.components.tradable then
-        --     return true
-        -- end
-        -- return false
-        -- for k, v in pairs(item.components) do
-        --     print("k=" .. tostring(k) .. "    v=" .. tostring(v))
-        --     print("type=" .. type(k))
-        -- end
-        -- print("item.components.tradable=" .. tostring(item.components["tradable"] ~= nil))
-        -- print("type="..type(item.components.tradable~=nil))
-        -- print("------------------------------------------------")
-        -- local b = (item.components.tradable ~= nil)
-        -- print("true"..type(true))
+        
         return true
     end
 }
@@ -60,9 +44,11 @@ local function check(inst, giver, item)
         giver.components.talker:Say("该物品不可交易")
         return false
     end
-    if not (item.prefab == "birdcage" and inst.components.occupiable:IsOccupied() or true) then
-        giver.components.talker:Say("无稽之谈")
+    if item.prefab == "birdcage" then
+        if not inst.components.occupiable:IsOccupied() then
+            giver.components.talker:Say("无稽之谈")
         return false
+        end
     end
     if inst.components.sleeper and inst.components.sleeper:IsAsleep() then
         giver.components.talker:Say("晚安")
@@ -94,9 +80,12 @@ local function deal(giver, inst)
                         inst.TradeItem(inst)
                         inst.sg:GoToState("idle")
                     end
-                    --inst.components.container:ConsumeByName(item.prefab, 1) --消耗掉箱子里的物品
+                    if inst.prefab ~= "mermking" then
+                        inst.components.container:ConsumeByName(item.prefab, 1) --消耗掉箱子里的物品
+                    end
+                    
                 end
-                giver.components.talker:Say("交易成功！")
+                --giver.components.talker:Say("交易成功！")
                 
             end
         end
@@ -115,39 +104,107 @@ end
 AddModRPCHandler("Quick_deal", "pigking", deal)
 
 
+
 local function add_deal_container(inst)
     if not TheWorld.ismastersim then
         inst.OnEntityReplicated = function(inst)
-            inst.replica.container:WidgetSetup("backpack")
+            inst.replica.container:WidgetSetup("deal_container")
+            if inst.replica.inventory~=nil then
+                inst.replica.inventory.GetOverflowContainer = function(self)
+                    return self.inst.replica.container
+                end
+            end
         end
         return inst
     end
-    --添加容器组件
-    inst:AddComponent("container")
-    --设置容器名
-    inst.components.container:WidgetSetup("backpack")
-    -- inst.components.container.onopenfn = onopen
-    -- inst.components.container.onclosefn = onclose
-    print("prefab start!")
+    if not inst.components.container then
+        inst:AddComponent("container")
+        if inst.components.inventory~=nil then
+            inst.components.inventory.GetOverflowContainer = function(self)
+                return self.inst.components.container
+            end
+        end
+        inst.components.container:WidgetSetup("deal_container")
+        
+    end
+    print("add container success!")
+    -- --添加容器组件
+    -- inst:AddComponent("container")
+    -- --设置容器名
+    -- inst.components.container:WidgetSetup("deal_container")
+    -- -- inst.components.container.onopenfn = onopen
+    -- -- inst.components.container.onclosefn = onclose
+    -- print("prefab start!")
 end
-Quick_deal_actions_give = ACTIONS.GIVE
+-- Quick_deal_actions_give = deepcopy(ACTIONS.GIVE)
+-- Quick_deal_actions_give.priority = 999
+local Quick_deal_actions_give = deepcopy(ACTIONS.GIVE)
+-- Quick_deal_actions_give.fn = function(act)
+--     ACTIONS.GIVE.fn(act)
+-- end
+Quick_deal_actions_give.id = "Quick_deal_actions_give"
+-- Quick_deal_actions_give.str = ACTIONS.GIVE.str
 Quick_deal_actions_give.priority = 999
+AddAction(Quick_deal_actions_give)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_give, "give"))
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_give,"give"))
+-- ACTIONS.Quick_deal_actions_give.priority = 999
 --搞一个新的给予判断（原判断放箱子的判定大于给予判定）
 Quick_deal_give = function(inst, doer, target, actions)
+    
     if target:HasTag("trader") and
         not (target:HasTag("player") or target:HasTag("ghost")) and
-        not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding() and
+        not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding() and--还要增添额外判定
             not (target.replica.inventoryitem ~= nil and target.replica.inventoryitem:IsGrandOwner(doer))) and
-        (target.prefab == "pigking" or target.prefab == "antlion" or target.prefab == "birdcage" or target.prefab == "mermking") then
-        table.insert(actions, Quick_deal_actions_give)
+            (target.prefab == "pigking" or target.prefab == "antlion" or target.prefab == "birdcage" or target.prefab == "mermking") then
+        table.insert(actions,ACTIONS.Quick_deal_actions_give)
+    end
+    
+end
+AddComponentAction("USEITEM", "tradable", Quick_deal_give)
+
+
+--因为存储.容器的代码顺序在放鸟之前，所以特判调整一下原函数位置
+old_store = ACTIONS.STORE.fn
+Quick_deal_actions_store = function(act)
+    local target = act.target
+    if target.prefab == "birdcage" and act.invobject ~= nil and
+        act.invobject.components.occupier ~= nil and
+        target.components.occupiable ~= nil and
+        target.components.occupiable:CanOccupy(act.invobject) then
+        return target.components.occupiable:Occupy(act.invobject.components.inventoryitem:RemoveFromOwner())
+    end
+    old_store(act)--会说废话，回头优化
+end
+ACTIONS.STORE.fn = Quick_deal_actions_store
+
+
+Quick_deal_actions_container = deepcopy(ACTIONS.RUMMAGE)
+Quick_deal_actions_container.id = "Quick_deal_actions_container"
+Quick_deal_actions_container.priority = 999
+AddAction(Quick_deal_actions_container)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_container, "doshortaction"))
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_container,"doshortaction"))
+Quick_deal_container = function(inst, doer, actions, right)
+    if inst:HasTag("bundle") then
+        if right and inst.replica.container:IsOpenedBy(doer) then
+            table.insert(actions, doer.components.constructionbuilderuidata ~= nil and doer.components.constructionbuilderuidata:GetContainer() == inst and ACTIONS.APPLYCONSTRUCTION or ACTIONS.WRAPBUNDLE)
+        end
+    elseif not inst:HasTag("burnt")
+        and inst.replica.container:CanBeOpened()
+        and doer.replica.inventory ~= nil
+        and (not inst:HasTag("oceantrawler") or not inst:HasTag("trawler_lowered"))
+        and not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding())
+        and inst.prefab=="birdcage" then
+        table.insert(actions, ACTIONS.Quick_deal_actions_container)
     end
 end
+AddComponentAction("SCENE", "container", Quick_deal_container)
+
 
 --添加Prefab
-AddPrefabPostInit("birdcage", add_deal_container)
-AddPrefabPostInit("mermking", add_deal_container)
 AddPrefabPostInit("pigking", add_deal_container)
 AddPrefabPostInit("antlion", add_deal_container)
--- AddPrefabPostInit("birdcage", add_deal_container)
--- AddPrefabPostInit("mermking", add_deal_container)
-AddComponentAction("USEITEM", "tradable", Quick_deal_give, "Quick_deal")
+AddPrefabPostInit("birdcage", add_deal_container)
+AddPrefabPostInit("mermking", add_deal_container)
+AddPrefabPostInit("monkeyqueen", add_deal_container)
