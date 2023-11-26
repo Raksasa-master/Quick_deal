@@ -63,6 +63,51 @@ local function check(inst, giver, item)
     return true
 end
 
+
+-- function StateGraphInstance:HasState(statename)
+--     return self.sg.states[statename] ~= nil
+-- end
+
+-- 修改月亮女王的交易函数运行方式（官方的方式是在sg结束后运行）
+local function Monkeyqueen_deal(inst, giver, item)
+    local takemonkeycurse = false
+    inst.sg.statemem.giver = giver
+    if inst.sg.statemem.giver then
+        if inst.sg.statemem.giver.components.cursable and (inst.sg.statemem.giver.components.cursable.curses.MONKEY or 0) > 0 then
+            takemonkeycurse = true
+        elseif inst.sg.statemem.giver:HasTag("wonkey") then -- NOTES(JBK): This only is true if the player gets into an invalid state, saves and reloads the save.
+            takemonkeycurse = true
+        end
+    end
+    if takemonkeycurse then
+        print("takemonkeycurse----")
+        local data = {giver = giver}
+        inst.sg.sg.states["removecurse"].onenter(inst, data)
+        inst.sg.sg.states["removecurse"].events["animover"].fn(inst)
+        -- for _, v in ipairs(inst.sg.sg.states["removecurse"].events) do
+        --     print(v.name)
+        --     if v.name == "animover" then
+        --         v.fn(inst)
+        --     end    
+        -- end
+    else
+        print("not takemonkeycurse----")
+        local data = {item = item,giver = giver}
+        inst.sg.sg.states["getitem"].onenter(inst, data)
+        inst.sg.sg.states["getitem"].events["animover"].fn(inst)
+        -- for _, v in ipairs(inst.sg.sg.states["getitem"].events) do
+        --     print(v.name)
+        --     if v.name == "animover" then
+        --         v.fn(inst)
+        --     end    
+        -- end
+    end
+        
+end
+
+
+
+
 --交易函数
 local function deal(giver, inst)
     for i = 1, 9 do
@@ -72,7 +117,11 @@ local function deal(giver, inst)
             local OnGetItemFromPlayer = inst.components.trader.onaccept
             for i = 1, num do
                 if check(inst, giver, item) then           --判断是否可以交易，鱼人王会有吃饱的情况，所以反复判断，减少食物浪费
-                    OnGetItemFromPlayer(inst, giver, item) --进行交易
+                    if inst.prefab ~="monkeyqueen" then
+                        OnGetItemFromPlayer(inst, giver, item) --进行交易
+                    else
+                        Monkeyqueen_deal(inst, giver, item)
+                    end
                     if inst.prefab == "antlion" then       --特判蚁狮，蚁狮的给物品方式不同
                         inst.GiveReward(inst)
                     end
@@ -125,30 +174,22 @@ local function add_deal_container(inst)
             end
         end
         inst.components.container:WidgetSetup("deal_container")
-        
+        inst:ListenForEvent("onremove", function(inst)
+            if inst.components.container then
+                inst.components.container:DropEverything()
+            end
+        end)
     end
     print("add container success!")
-    -- --添加容器组件
-    -- inst:AddComponent("container")
-    -- --设置容器名
-    -- inst.components.container:WidgetSetup("deal_container")
-    -- -- inst.components.container.onopenfn = onopen
-    -- -- inst.components.container.onclosefn = onclose
-    -- print("prefab start!")
 end
--- Quick_deal_actions_give = deepcopy(ACTIONS.GIVE)
--- Quick_deal_actions_give.priority = 999
+
 local Quick_deal_actions_give = deepcopy(ACTIONS.GIVE)
--- Quick_deal_actions_give.fn = function(act)
---     ACTIONS.GIVE.fn(act)
--- end
 Quick_deal_actions_give.id = "Quick_deal_actions_give"
--- Quick_deal_actions_give.str = ACTIONS.GIVE.str
 Quick_deal_actions_give.priority = 999
 AddAction(Quick_deal_actions_give)
+-- instant可以充当SG的参数，就是Acthandler函数的第二个值，可以无SG来运行动作（未尝试），nil会使用默认SG
 AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_give, "give"))
 AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_give,"give"))
--- ACTIONS.Quick_deal_actions_give.priority = 999
 --搞一个新的给予判断（原判断放箱子的判定大于给予判定）
 Quick_deal_tradable = function(inst, doer, target, actions)
     
@@ -162,21 +203,6 @@ Quick_deal_tradable = function(inst, doer, target, actions)
     
 end
 AddComponentAction("USEITEM", "tradable", Quick_deal_tradable)
-
-
--- --因为存储.容器的代码顺序在放鸟之前，所以特判调整一下原函数位置
--- old_store = ACTIONS.STORE.fn
--- Quick_deal_actions_store = function(act)
---     local target = act.target
---     if target.prefab == "birdcage" and act.invobject ~= nil and
---         act.invobject.components.occupier ~= nil and
---         target.components.occupiable ~= nil and
---         target.components.occupiable:CanOccupy(act.invobject) then
---         return target.components.occupiable:Occupy(act.invobject.components.inventoryitem:RemoveFromOwner())
---     end
---     old_store(act)--会说废话，回头优化
--- end
--- ACTIONS.STORE.fn = Quick_deal_actions_store
 
 
 --因为存储.容器的代码顺序在放鸟之前，所以特判调整一下原函数位置
@@ -246,6 +272,12 @@ Quick_deal_occupiable = function(inst, doer, actions, right)
     end
 end
 AddComponentAction("SCENE", "shelf", Quick_deal_occupiable)
+
+
+
+
+
+
 
 --添加Prefab
 AddPrefabPostInit("pigking", add_deal_container)
