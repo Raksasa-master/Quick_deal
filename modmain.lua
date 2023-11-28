@@ -55,11 +55,15 @@ local function check(inst, giver, item)
         return false
     end
     local AcceptTest = inst.components.trader.test --获得交易目标的判断交易函数
-    if not AcceptTest(inst, item, giver) then
-        giver.components.talker:Say("不接受该物品")
-        return false
+    if inst.prefab =="monkeyisland_portal" then
+        AcceptTest = inst.components.trader.abletoaccepttest
     end
-
+    if AcceptTest then
+        if not AcceptTest(inst, item, giver) then
+            giver.components.talker:Say("不接受该物品")
+            return false
+        end
+    end
     return true
 end
 
@@ -104,9 +108,7 @@ local function Monkeyqueen_deal(inst, giver, item)
     end
         
 end
-
-
-
+--非自然传送门交易
 
 --交易函数
 local function deal(giver, inst)
@@ -117,10 +119,12 @@ local function deal(giver, inst)
             local OnGetItemFromPlayer = inst.components.trader.onaccept
             for i = 1, num do
                 if check(inst, giver, item) then           --判断是否可以交易，鱼人王会有吃饱的情况，所以反复判断，减少食物浪费
-                    if inst.prefab ~="monkeyqueen" then
-                        OnGetItemFromPlayer(inst, giver, item) --进行交易
-                    else
+                    if inst.prefab =="monkeyqueen" then
                         Monkeyqueen_deal(inst, giver, item)
+                    elseif inst.prefab == "monkeyisland_portal" then
+                        inst:PushEvent("timerdone",{name = "fireportalevent"})
+                    else
+                        OnGetItemFromPlayer(inst, giver, item) --进行交易
                     end
                     if inst.prefab == "antlion" then       --特判蚁狮，蚁狮的给物品方式不同
                         inst.GiveReward(inst)
@@ -132,7 +136,9 @@ local function deal(giver, inst)
                     if inst.prefab ~= "mermking" then
                         inst.components.container:ConsumeByName(item.prefab, 1) --消耗掉箱子里的物品
                     end
-                    
+                    if inst.prefab =="monkeyisland_portal" then
+                        TUNING.MONKEYISLAND_PORTAL_ENABLED = true
+                    end
                 end
                 --giver.components.talker:Say("交易成功！")
                 
@@ -174,6 +180,11 @@ local function add_deal_container(inst)
             end
         end
         inst.components.container:WidgetSetup("deal_container")
+        inst:ListenForEvent("death", function(inst)
+            if inst.components.container then
+                inst.components.container:DropEverything()
+            end
+        end)
         inst:ListenForEvent("onremove", function(inst)
             if inst.components.container then
                 inst.components.container:DropEverything()
@@ -285,3 +296,4 @@ AddPrefabPostInit("antlion", add_deal_container)
 AddPrefabPostInit("birdcage", add_deal_container)
 AddPrefabPostInit("mermking", add_deal_container)
 AddPrefabPostInit("monkeyqueen", add_deal_container)
+AddPrefabPostInit("monkeyisland_portal", add_deal_container)
