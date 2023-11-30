@@ -1,9 +1,21 @@
-print("hello world")
-print("test\n")
-
-
 GLOBAL.setmetatable(env, { __index = function(t, k) return GLOBAL.rawget(GLOBAL, k) end })
 
+local Quick_dealer = {
+    "pigking",
+    "antlion",
+    "birdcage",
+    "mermking",
+    "monkeyqueen",
+    "monkeyisland_portal"
+}
+local  function Is_Quick_dealer(target)
+    for index, value in ipairs(Quick_dealer) do
+        if target.prefab == value then
+            return true
+        end
+    end
+    return false
+end
 
 --获取容器模块
 local containers = require("containers")
@@ -11,66 +23,42 @@ local params = containers.params
 
 
 --给容器对象添加容器
-params.deal_container = {
-    widget = {
-        slotpos = {},
-        animbank = "ui_chest_3x3",
-        animbuild = "ui_chest_3x3",
-        pos = Vector3(0, 200, 0),
-        side_align_tip = 0,
-        buttoninfo =
-        {
-            text = "交易",
-            position = Vector3(0, -140, 0),
-        }
-    },
-    type = "deal_container",
-    itemtestfn = function(container, item, slot)
-        
-        return true
-    end
-}
+params.deal_container = deepcopy(params.shadowchester)
+params.deal_container.widget.buttoninfo = { text = "交易", position = Vector3(0, -175, 0) }
+params.deal_container.type = "deal_container"
 
 
---添加格子
-for y = 2, 0, -1 do
-    for x = 0, 2 do
-        table.insert(params.deal_container.widget.slotpos, Vector3(80 * x - 80 * 2 + 80, 80 * y - 80 * 2 + 80, 0))
-    end
-end
+
+
 -- --检查交易是否能进行
 local function check(inst, giver, item)
     if not item.components.tradable then
-        giver.components.talker:Say("该物品不可交易")
+        -- giver.components.talker:Say("该物品不可交易")
         return false
     end
-    if inst.prefab == "birdcage" then
-        if not inst.components.occupiable:IsOccupied() then
-            giver.components.talker:Say("无稽之谈")
+    if inst.prefab == "birdcage" and not inst.components.occupiable:IsOccupied() then
+        giver.components.talker:Say("无稽之谈")
         return false
-        end
     end
     if inst.components.sleeper and inst.components.sleeper:IsAsleep() then
         giver.components.talker:Say("晚安")
         return false
     end
-    local AcceptTest = inst.components.trader.test --获得交易目标的判断交易函数
-    if inst.prefab =="monkeyisland_portal" then
-        AcceptTest = inst.components.trader.abletoaccepttest
+    local AbleToAcceptTest = inst.components.trader.abletoaccepttest --判断交易目标能否进行交易
+    local AcceptTest = inst.components.trader.test --判断物品能否被交易
+    if inst.prefab == "pigking" and inst.components.minigame:IsActive() then
+        giver.components.talker:Say("开始游戏")
+        return false
     end
-    if AcceptTest then
-        if not AcceptTest(inst, item, giver) then
-            giver.components.talker:Say("不接受该物品")
-            return false
-        end
+    if inst.prefab == "monkeyisland_portal" then --非自然传送门没有AcceptTest函数
+        AcceptTest = AbleToAcceptTest
+    end
+    if AcceptTest and not AcceptTest(inst, item, giver) then
+        -- giver.components.talker:Say("不接受该物品")
+        return false
     end
     return true
 end
-
-
--- function StateGraphInstance:HasState(statename)
---     return self.sg.states[statename] ~= nil
--- end
 
 -- 修改月亮女王的交易函数运行方式（官方的方式是在sg结束后运行）
 local function Monkeyqueen_deal(inst, giver, item)
@@ -88,23 +76,11 @@ local function Monkeyqueen_deal(inst, giver, item)
         local data = {giver = giver}
         inst.sg.sg.states["removecurse"].onenter(inst, data)
         inst.sg.sg.states["removecurse"].events["animover"].fn(inst)
-        -- for _, v in ipairs(inst.sg.sg.states["removecurse"].events) do
-        --     print(v.name)
-        --     if v.name == "animover" then
-        --         v.fn(inst)
-        --     end    
-        -- end
     else
         print("not takemonkeycurse----")
         local data = {item = item,giver = giver}
         inst.sg.sg.states["getitem"].onenter(inst, data)
         inst.sg.sg.states["getitem"].events["animover"].fn(inst)
-        -- for _, v in ipairs(inst.sg.sg.states["getitem"].events) do
-        --     print(v.name)
-        --     if v.name == "animover" then
-        --         v.fn(inst)
-        --     end    
-        -- end
     end
         
 end
@@ -112,7 +88,7 @@ end
 
 --交易函数
 local function deal(giver, inst)
-    for i = 1, 9 do
+    for i = 1, #params.deal_container.widget.slotpos do
         local item = inst.components.container:GetItemInSlot(i)                                  --获得箱子第i格的东西
         if item ~= nil then                                                                      --如果这一格为空就跳过
             local num = item.components.stackable and item.components.stackable:StackSize() or 1 --获得其数量
@@ -152,11 +128,11 @@ function params.deal_container.widget.buttoninfo.fn(inst, doer)
     if TheWorld.ismastersim then
         deal(doer, inst)
     else
-        SendModRPCToServer(MOD_RPC["Quick_deal"]["pigking"], inst)
+        SendModRPCToServer(MOD_RPC["Quick_deal"]["deal"], inst)
     end
 end
 
-AddModRPCHandler("Quick_deal", "pigking", deal)
+AddModRPCHandler("Quick_deal", "deal", deal)
 
 
 
@@ -206,9 +182,9 @@ Quick_deal_tradable = function(inst, doer, target, actions)
     
     if target:HasTag("trader") and
         not (target:HasTag("player") or target:HasTag("ghost")) and
-        not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding() and--还要增添额外判定
+        not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding() and
             not (target.replica.inventoryitem ~= nil and target.replica.inventoryitem:IsGrandOwner(doer))) and
-            (target.prefab == "pigking" or target.prefab == "antlion" or target.prefab == "birdcage" or target.prefab == "mermking") then
+            Is_Quick_dealer(target) then
         table.insert(actions,ACTIONS.Quick_deal_actions_give)
     end
     
@@ -285,15 +261,9 @@ end
 AddComponentAction("SCENE", "shelf", Quick_deal_occupiable)
 
 
-
-
-
-
-
 --添加Prefab
-AddPrefabPostInit("pigking", add_deal_container)
-AddPrefabPostInit("antlion", add_deal_container)
-AddPrefabPostInit("birdcage", add_deal_container)
-AddPrefabPostInit("mermking", add_deal_container)
-AddPrefabPostInit("monkeyqueen", add_deal_container)
-AddPrefabPostInit("monkeyisland_portal", add_deal_container)
+for index, value in ipairs(Quick_dealer) do
+    AddPrefabPostInit(value, add_deal_container)
+end
+
+
