@@ -50,6 +50,10 @@ local function check(inst, giver, item)
         giver.components.talker:Say("开始游戏")
         return false
     end
+    if not inst.components.trader.enabled then
+        giver.components.talker:Say("无法交易")
+        return false
+    end
     if inst.prefab == "monkeyisland_portal" then --非自然传送门没有AcceptTest函数
         AcceptTest = AbleToAcceptTest
     end
@@ -72,12 +76,10 @@ local function Monkeyqueen_deal(inst, giver, item)
         end
     end
     if takemonkeycurse then
-        print("takemonkeycurse----")
         local data = {giver = giver}
         inst.sg.sg.states["removecurse"].onenter(inst, data)
         inst.sg.sg.states["removecurse"].events["animover"].fn(inst)
     else
-        print("not takemonkeycurse----")
         local data = {item = item,giver = giver}
         inst.sg.sg.states["getitem"].onenter(inst, data)
         inst.sg.sg.states["getitem"].events["animover"].fn(inst)

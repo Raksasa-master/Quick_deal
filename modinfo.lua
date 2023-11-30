@@ -1,9 +1,9 @@
-name = "Quick_deal"
+name = "快速交易(Quick_deal)"
 author = "Raksasa_master"
 description = [[
 请尽量不要本mod和其他快速交易的mod同时使用
 
-本mod可以与猪王、鸟笼、蚁狮、鱼人王和非自然传送门快速交易
+本mod可以与猪王、鸟笼、蚁狮、鱼人王、月亮码头女王和非自然传送门快速交易
 
 本mod以兼容性为主，所以可以尝试和其他对交易内容有改动的mod一起使用，不过尝试前请记得保存存档，以免发生意外情况炸档
 
@@ -21,7 +21,7 @@ description = [[
 
 膜拜大佬们
 ]]
-version = "1.0.0"
+version = "0.1.2"
 dst_compatible = true
 forge_compatible = false
 gorge_compatible = false
