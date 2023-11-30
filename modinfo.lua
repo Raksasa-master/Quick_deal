@@ -13,6 +13,13 @@ description = [[
 
 兼容永不妥协的怪物蛋交易
 
+感谢饥荒mod答疑群的各位大佬的指点
+
+感谢 DST MOD开发教程
+
+本mod借鉴了王国-农民小屋、快速与猪王交易[dst]、批量交易
+
+膜拜大佬们
 ]]
 version = "1.0.0"
 dst_compatible = true
