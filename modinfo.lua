@@ -21,7 +21,7 @@ description = [[
 
 膜拜大佬们
 ]]
-version = "0.1.2"
+version = "0.1.3"
 dst_compatible = true
 forge_compatible = false
 gorge_compatible = false

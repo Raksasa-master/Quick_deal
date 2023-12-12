@@ -36,7 +36,7 @@ local function check(inst, giver, item)
         -- giver.components.talker:Say("该物品不可交易")
         return false
     end
-    if inst.prefab == "birdcage" and not inst.components.occupiable:IsOccupied() then
+    if inst.prefab == "birdcage" and (inst.components.occupiable==nil or not inst.components.occupiable:IsOccupied()) then
         giver.components.talker:Say("无稽之谈")
         return false
     end
@@ -172,13 +172,13 @@ local function add_deal_container(inst)
     print("add container success!")
 end
 
-local Quick_deal_actions_give = deepcopy(ACTIONS.GIVE)
-Quick_deal_actions_give.id = "Quick_deal_actions_give"
-Quick_deal_actions_give.priority = 999
-AddAction(Quick_deal_actions_give)
+local Quick_deal_action_give = deepcopy(ACTIONS.GIVE)
+Quick_deal_action_give.id = "Quick_deal_action_give"
+Quick_deal_action_give.priority = 999
+AddAction(Quick_deal_action_give)
 -- instant可以充当SG的参数，就是Acthandler函数的第二个值，可以无SG来运行动作（未尝试），nil会使用默认SG
-AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_give, "give"))
-AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_give,"give"))
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_action_give, "give"))
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_action_give,"give"))
 --搞一个新的给予判断（原判断放箱子的判定大于给予判定）
 Quick_deal_tradable = function(inst, doer, target, actions)
     
@@ -187,7 +187,7 @@ Quick_deal_tradable = function(inst, doer, target, actions)
         not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding() and
             not (target.replica.inventoryitem ~= nil and target.replica.inventoryitem:IsGrandOwner(doer))) and
             Is_Quick_dealer(target) then
-        table.insert(actions,ACTIONS.Quick_deal_actions_give)
+        table.insert(actions,ACTIONS.Quick_deal_action_give)
     end
     
 end
@@ -196,10 +196,10 @@ AddComponentAction("USEITEM", "tradable", Quick_deal_tradable)
 
 --因为存储.容器的代码顺序在放鸟之前，所以特判调整一下原函数位置
 --放鸟优先
-Quick_deal_actions_store = deepcopy(ACTIONS.STORE)
-Quick_deal_actions_store.id ="Quick_deal_actions_store"
-Quick_deal_actions_store.priority = 999
-Quick_deal_actions_store.fn = function(act)
+Quick_deal_action_store = deepcopy(ACTIONS.STORE)
+Quick_deal_action_store.id ="Quick_deal_action_store"
+Quick_deal_action_store.priority = 999
+Quick_deal_action_store.fn = function(act)
     local target = act.target
     if target.prefab == "birdcage" and act.invobject ~= nil and
         act.invobject.components.occupier ~= nil and
@@ -209,14 +209,14 @@ Quick_deal_actions_store.fn = function(act)
     end
     return false
 end
-AddAction(Quick_deal_actions_store)
-AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_store, "doshortaction"))
-AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_store,"doshortaction"))
+AddAction(Quick_deal_action_store)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_action_store, "doshortaction"))
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_action_store,"doshortaction"))
 Quick_deal_store = function(inst, doer, target, actions)
     for k, v in pairs(OCCUPANTTYPE) do
         if target.prefab == "birdcage" and target:HasTag(v .. "_occupiable") then
             if inst:HasTag(v) then
-                table.insert(actions, ACTIONS.Quick_deal_actions_store)
+                table.insert(actions, ACTIONS.Quick_deal_action_store)
             end
             return
         end
@@ -226,12 +226,12 @@ AddComponentAction("USEITEM", "occupier", Quick_deal_store)
 
 
 --左键开箱（鸟笼）
-Quick_deal_actions_container = deepcopy(ACTIONS.RUMMAGE)
-Quick_deal_actions_container.id = "Quick_deal_actions_container"
-Quick_deal_actions_container.priority = 999
-AddAction(Quick_deal_actions_container)
-AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_container, "doshortaction"))
-AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_container,"doshortaction"))
+Quick_deal_action_container = deepcopy(ACTIONS.RUMMAGE)
+Quick_deal_action_container.id = "Quick_deal_action_container"
+Quick_deal_action_container.priority = 999
+AddAction(Quick_deal_action_container)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_action_container, "doshortaction"))
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_action_container,"doshortaction"))
 Quick_deal_container = function(inst, doer, actions, right)
     if inst:HasTag("bundle") then
         if right and inst.replica.container:IsOpenedBy(doer) then
@@ -243,26 +243,41 @@ Quick_deal_container = function(inst, doer, actions, right)
         and (not inst:HasTag("oceantrawler") or not inst:HasTag("trawler_lowered"))
         and not (doer.replica.rider ~= nil and doer.replica.rider:IsRiding())
         and inst.prefab=="birdcage" then
-        table.insert(actions, ACTIONS.Quick_deal_actions_container)
+        table.insert(actions, ACTIONS.Quick_deal_action_container)
     end
 end
 AddComponentAction("SCENE", "container", Quick_deal_container)
-Quick_deal_actions_harvest = deepcopy(ACTIONS.HARVEST)
-Quick_deal_actions_harvest.id = "Quick_deal_actions_harvest"
-Quick_deal_actions_harvest.priority = 1000--测试发现好像要求右键的优先级要比左键高才能使用右键
-AddAction(Quick_deal_actions_harvest)
-AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_actions_harvest,"give"))--需要优化，原先不是这个SG
-AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_actions_harvest,"give"))
+
+Quick_deal_action_harvest = deepcopy(ACTIONS.HARVEST)
+Quick_deal_action_harvest.id = "Quick_deal_action_harvest"
+Quick_deal_action_harvest.priority = 1000--测试发现好像要求右键的优先级要比左键高才能使用右键
+AddAction(Quick_deal_action_harvest)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_action_harvest,"give"))--需要优化，原先不是这个SG
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_action_harvest,"give"))
 
 --右键拿鸟（鸟笼）
 Quick_deal_occupiable = function(inst, doer, actions, right)
     if inst:HasTag("occupied") and inst.prefab == "birdcage" and right then
-        table.insert(actions, ACTIONS.Quick_deal_actions_harvest)
+        table.insert(actions, ACTIONS.Quick_deal_action_harvest)
     end
 end
-AddComponentAction("SCENE", "shelf", Quick_deal_occupiable)
+AddComponentAction("SCENE", "occupiable", Quick_deal_occupiable)
 
 
+--右键取出鸟的尸体
+Quick_deal_action_takeitem = deepcopy(ACTIONS.TAKEITEM)
+Quick_deal_action_takeitem.id = "Quick_deal_action_takeitem"
+Quick_deal_action_takeitem.priority = 1000--测试发现好像要求右键的优先级要比左键高才能使用右键
+AddAction(Quick_deal_action_takeitem)
+AddStategraphActionHandler("wilson", ActionHandler(ACTIONS.Quick_deal_action_takeitem,"give"))--需要优化，原先不是这个SG
+AddStategraphActionHandler("wilson_client",ActionHandler(ACTIONS.Quick_deal_action_takeitem,"give"))
+
+Quick_deal_shelf = function(inst, doer, actions, right)
+    if inst:HasTag("takeshelfitem") and inst.prefab == "birdcage" and right then
+        table.insert(actions, ACTIONS.Quick_deal_action_takeitem)
+    end
+end
+AddComponentAction("SCENE", "shelf", Quick_deal_shelf)
 --添加Prefab
 for index, value in ipairs(Quick_dealer) do
     AddPrefabPostInit(value, add_deal_container)
