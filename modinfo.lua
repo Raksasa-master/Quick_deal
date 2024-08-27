@@ -1,6 +1,11 @@
 name = "快速交易(Quick_deal)"
 author = "Raksasa_master"
 description = [[
+
+0.1.4版本更新，兼容鱼人王的三叉戟，铥矿头，大理石甲的给予
+
+感谢alt大佬的技术支持
+
 请尽量不要本mod和其他快速交易的mod同时使用
 
 本mod可以与猪王、鸟笼、蚁狮、鱼人王、月亮码头女王和非自然传送门快速交易
@@ -21,7 +26,7 @@ description = [[
 
 膜拜大佬们
 ]]
-version = "0.1.3"
+version = "0.1.4"
 dst_compatible = true
 forge_compatible = false
 gorge_compatible = false
