@@ -28,10 +28,13 @@ params.deal_container.widget.buttoninfo = { text = "交易", position = Vector3(
 params.deal_container.type = "deal_container"
 
 
-
-
 -- --检查交易是否能进行
 local function check(inst, giver, item)
+    local quick_deal_cd = GetModConfigData("quick_deal_cd")
+    if not inst.can_deal then
+        giver.components.talker:Say(tostring(quick_deal_cd) .."秒冷却防刷")
+        return false
+    end
     if not item.components.tradable then
         -- giver.components.talker:Say("该物品不可交易")
         return false
@@ -85,17 +88,25 @@ local function Monkeyqueen_deal(inst, giver, item)
         inst.sg.sg.states["getitem"].events["animover"].fn(inst)
     end
 end
---非自然传送门交易
+
 
 --交易函数
 local function deal(giver, inst)
-    for i = 1, #params.deal_container.widget.slotpos do
-        local item = inst.components.container:GetItemInSlot(i)                                  --获得箱子第i格的东西
+
+    local deal_success = false  --交易是否成功，用于判断是否成功进行过交易
+    local temp_count = 0    --当前交易次数
+    local quick_deal_count = GetModConfigData("quick_deal_count")   --限制交易次数
+    for index = 1, #params.deal_container.widget.slotpos do
+        local item = inst.components.container:GetItemInSlot(index)                              --获得箱子第i格的东西
         if item ~= nil then                                                                      --如果这一格为空就跳过
             local num = item.components.stackable and item.components.stackable:StackSize() or 1 --获得其数量
             local OnGetItemFromPlayer = inst.components.trader.onaccept
             for i = 1, num do
-                if check(inst, giver, item) then --判断是否可以交易，鱼人王会有吃饱的情况，所以反复判断，减少食物浪费
+                if check(inst, giver, item) then           --判断是否可以交易，鱼人王会有吃饱的情况，所以反复判断，减少食物浪费
+                    if temp_count >= quick_deal_count then --判断是否大于限制次数
+                        break
+                    end
+                    temp_count = temp_count + 1
                     if inst.prefab == "monkeyqueen" then
                         Monkeyqueen_deal(inst, giver, item)
                     elseif inst.prefab == "monkeyisland_portal" then
@@ -116,10 +127,17 @@ local function deal(giver, inst)
                     if inst.prefab == "monkeyisland_portal" then
                         TUNING.MONKEYISLAND_PORTAL_ENABLED = true
                     end
+                    deal_success = true
                 end
                 --giver.components.talker:Say("交易成功！")
             end
         end
+    end
+    --增加防刷限制，先将inst的can_deal置为false，然后定时将状态改回去
+    if deal_success then
+        local quick_deal_cd = GetModConfigData("quick_deal_cd")
+        inst.can_deal = false
+        inst:DoTaskInTime(quick_deal_cd,function(inst) inst.can_deal = true end)
     end
 end
 
@@ -167,7 +185,9 @@ local function add_deal_container(inst)
             end
         end)
     end
-    print("add container success!")
+    -- print("add container success!")
+
+    inst.can_deal = true    --新增防刷状态
 end
 local Quick_deal_action_give = deepcopy(ACTIONS.GIVE)
 Quick_deal_action_give.id = "Quick_deal_action_give"
@@ -314,6 +334,8 @@ end
 AddComponentAction("SCENE", "shelf", Quick_deal_shelf)
 --添加Prefab
 for index, value in ipairs(Quick_dealer) do
-    AddPrefabPostInit(value, add_deal_container)
+    if GetModConfigData("quick_deal_" .. value) then
+        AddPrefabPostInit(value, add_deal_container)
+    end
 end
 
